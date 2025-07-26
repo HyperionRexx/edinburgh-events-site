@@ -1,27 +1,36 @@
 const fetch = require("node-fetch");
 
 exports.handler = async function (event) {
-  const { type, date, price } = event.queryStringParameters;
+  const { type, date, price } = event.queryStringParameters || {};
   const apiKey = "SBO6YLP2F9tkYK3KRZKca6ORfdLRVYgS";
-  const keywordMap = {
-    music: "music",
-    exhibition: "exhibition",
-    theatre: "theatre",
-    workshop: "workshop",
+
+  const classificationMap = {
+    music: "Music",
+    exhibition: "Exhibition",
+    theatre: "Theatre",
+    workshop: "Workshop",
   };
 
-  let url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${apiKey}&city=Edinburgh&countryCode=GB&size=12`;
+  let url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${apiKey}&city=Edinburgh&countryCode=GB&size=20`;
 
-  if (type && type !== "all") url += `&keyword=${keywordMap[type]}`;
+  if (type && type !== "all" && classificationMap[type]) {
+    url += `&classificationName=${classificationMap[type]}`;
+  }
+
   if (date) {
     const startISO = new Date(date + "T00:00:00Z").toISOString();
     const endISO = new Date(date + "T23:59:59Z").toISOString();
     url += `&startDateTime=${startISO}&endDateTime=${endISO}`;
   }
 
+  console.log("Fetching URL:", url);
+
   try {
     const response = await fetch(url);
     const data = await response.json();
+
+    console.log("API response:", data);
+
     return {
       statusCode: 200,
       headers: {
