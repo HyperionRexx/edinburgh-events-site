@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edinburgh Events</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .hero {
+      background-color: #1a202c;
+    }
+  </style>
+</head>
+<body class="text-gray-800">
+  <div class="min-h-screen">
+    <header class="hero relative h-32 flex items-center justify-center text-white shadow-md">
+      <div class="container mx-auto px-4 text-center py-6">
+        <h1 class="text-3xl font-bold">What's On in Edinburgh</h1>
+        <p class="text-base mt-1">Live Music, Art Exhibitions, Theatre & More</p>
+      </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-10">
+      <section class="mb-10">
+        <h2 class="text-2xl font-semibold mb-4">Filter Events</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <select id="eventType" class="w-full p-3 rounded border">
+            <option value="all">All Types</option>
+            <option value="music">Live Music</option>
+            <option value="exhibition">Exhibitions</option>
+            <option value="theatre">Theatre</option>
+            <option value="workshop">Workshops</option>
+          </select>
+          <input type="date" id="eventDate" class="w-full p-3 rounded border" placeholder="Select Date">
+          <select id="eventPrice" class="w-full p-3 rounded border">
+            <option value="all">All Prices</option>
+            <option value="free">Free</option>
+            <option value="under10">Under £10</option>
+            <option value="10to30">£10 - £30</option>
+            <option value="30plus">£30+</option>
+          </select>
+        </div>
+        <button onclick="searchEvents()" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">Search Events</button>
+      </section>
+
+      <section id="eventResults" class="mb-12">
+        <h2 class="text-2xl font-semibold mb-6">Upcoming Events</h2>
+        <div id="eventList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Dynamic results will appear here -->
+        </div>
+      </section>
+
+      <section class="bg-white p-6 rounded shadow max-w-xl mx-auto">
+        <h2 class="text-xl font-semibold mb-4 text-center">Stay in the Loop</h2>
+        <p class="text-center text-gray-600 mb-4">Subscribe to our newsletter and get alerts on new events each week.</p>
+        <form class="flex flex-col md:flex-row gap-4">
+          <input type="email" placeholder="Enter your email" class="flex-grow p-3 rounded border" required />
+          <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">Subscribe</button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="text-center text-sm text-gray-500 py-6">
+      &copy; 2025 Edinburgh Events. All rights reserved.
+    </footer>
+  </div>
+
+  <script>
+    async function searchEvents() {
+      const type = document.getElementById('eventType').value;
+      const date = document.getElementById('eventDate').value;
+      const price = document.getElementById('eventPrice').value;
+
+      const resultContainer = document.getElementById('eventList');
+      resultContainer.innerHTML = '<p class="text-gray-500">Searching events...</p>';
+
+      try {
+        const queryParams = new URLSearchParams({ type, date, price });
+        const response = await fetch(`/.netlify/functions/fetch-events?${queryParams.toString()}`);
+        const data = await response.json();
+
+        if (!data._embedded || !data._embedded.events || !data._embedded.events.length) {
+          resultContainer.innerHTML = '<p class="text-gray-500">No events found.</p>';
+          return;
+        }
+
+        const events = data._embedded.events.filter(event => {
+          if (!event.priceRanges || event.priceRanges.length === 0) return true;
+          const priceMin = event.priceRanges[0].min;
+
+          if (price === 'free' && priceMin > 0) return false;
+          if (price === 'under10' && priceMin >= 10) return false;
+          if (price === '10to30' && (priceMin < 10 || priceMin > 30)) return false;
+          if (price === '30plus' && priceMin <= 30) return false;
+
+          return true;
+        });
+
+        if (events.length === 0) {
+          resultContainer.innerHTML = '<p class="text-gray-500">No events match your criteria.</p>';
+          return;
+        }
+
+        resultContainer.innerHTML = events.map(event => {
+          const title = event.name;
+          const date = event.dates.start.localDate;
+          const price = event.priceRanges ? `£${event.priceRanges[0].min}` : 'Price not listed';
+          const venue = event._embedded.venues[0].name;
+
+          return `
+            <div class="bg-white p-4 rounded shadow">
+              <h3 class="text-xl font-bold">${title}</h3>
+              <p class="text-gray-600">${date} • ${price} • ${venue}</p>
+              <a href="${event.url}" target="_blank" class="text-blue-600 underline mt-2 inline-block">View Event</a>
+            </div>
+          `;
+        }).join('');
+
+      } catch (error) {
+        console.error("Error fetching events:", error);
+        resultContainer.innerHTML = '<p class="text-red-500">Error loading events. Please try again later.</p>';
+      }
+    }
+  </script>
+</body>
+</html>
